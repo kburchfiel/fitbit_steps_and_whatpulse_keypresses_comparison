@@ -1,0 +1,2 @@
+cd "C:\Users\kburc\D1V1\Documents\!Dell64docs\Programming\py\kjb3_programs\fitbit_steps_and_whatpulse_keypresses_comparison"
+python whatpulse_viewer_v2_as_python_file.py
