@@ -34,6 +34,7 @@ from scipy.stats import percentileofscore
 import plotly.express as px
 import kaleido
 from IPython.display import Image
+import datetime
 
 # %% [markdown]
 # ## Importing Whatpulse data
@@ -459,7 +460,22 @@ df_hourly_keypresses.set_index('day_and_hour', inplace = True)
 df_hourly_keypresses
 
 # %%
-full_hourly_date_range = pd.date_range(start = first_date, end = last_date, freq = 'H')
+last_date_for_hourly_keypress_log = last_date + datetime.timedelta(days = 1)
+last_date_for_hourly_keypress_log
+
+# %%
+# My means of getting a Pandas Timestamp representing the current time before
+# I found out about pd.Timestamp.now():
+# local_time = time.localtime(time.time())
+# local_time_string = f"{local_time.tm_year}-{local_time.tm_mon}-{local_time.tm_mday} {local_time.tm_hour}:{local_time.tm_min}"
+# local_time_timestamp = pd.to_datetime(local_time_string)
+# local_time_timestamp
+
+# %%
+pd.Timestamp.now()
+
+# %%
+full_hourly_date_range = pd.date_range(start = first_date, end = last_date_for_hourly_keypress_log, freq = 'H')
 df_hourly_keypresses = df_hourly_keypresses.reindex(full_hourly_date_range)
 df_hourly_keypresses['keypresses'].fillna(0, inplace = True)
 df_hourly_keypresses['keypresses'] = df_hourly_keypresses['keypresses'].astype('int')
@@ -468,21 +484,35 @@ df_hourly_keypresses['hour'] = df_hourly_keypresses.index.hour
 df_hourly_keypresses
 
 # %%
+df_hourly_keypresses = df_hourly_keypresses[df_hourly_keypresses.index < pd.Timestamp.now()].copy()
 df_hourly_keypresses.reset_index(drop=True,inplace=True)
 
+# %%
+df_hourly_keypresses['keypresses_over_last_24_hours'] = df_hourly_keypresses['keypresses'].rolling(24).sum()
 df_hourly_keypresses
 
 # %%
-df_hourly_keypresses[df_hourly_keypresses.duplicated(subset = ['day', 'hour'], keep = False)]
+print("Keypresses over the last 25 hours (excluding hours with 0 keypresses):\n",df_hourly_keypresses.iloc[-25:].query("keypresses > 0"))
+# Hours with 0 keypresses are removed in order to give the console output more
+# space to fit on a single line.
+
+# %% [markdown]
+# Keypresses for the last 48 hours (including hours with 0 keypresses, now that they have been added to our table):
 
 # %%
-print("Most recent hourly keypress logs:\n",df_hourly_keypresses.iloc[-20:])
+df_hourly_keypresses.iloc[-48:]
+
+# %%
+df_hourly_keypresses[df_hourly_keypresses.duplicated(subset = ['day', 'hour'], keep = False)]
 
 # %% [markdown]
 # Most keypresses typed in a single hour:
 
 # %%
-df_hourly_keypresses.sort_values('keypresses', ascending = False)
+df_hourly_keypresses.sort_values('keypresses', ascending = False).head(20)
+
+# %%
+df_hourly_keypresses.sort_values('keypresses_over_last_24_hours', ascending = False).head(20)
 
 # %% [markdown]
 # Keypresses by hour:
