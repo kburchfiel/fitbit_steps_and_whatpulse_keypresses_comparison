@@ -1,15 +1,25 @@
 # %% [markdown]
-# # WhatPulse Keypress Counter
+# # WhatPulse Keypress Stats Analyzer
 # 
 # By Kenneth Burchfiel
 # 
 # Released under the MIT license
 # 
-# (I am not affiliated with WhatPulse (https://whatpulse.org) but highly recommend checking out the program, which I've used since September 2008. You can find my online WhatPulse page here: https://whatpulse.org/KBurchfiel)
+# *(I am not affiliated with WhatPulse (https://whatpulse.org) but highly recommend checking out the program, which I've used since September 2008. You can find my online WhatPulse page here: https://whatpulse.org/KBurchfiel)*
 # 
-# This program reads Whatpulse keypress data (stored in local SQLite databases); combines that data into a single Pandas DataFrame; and then performs analyses on that data.
+# This script allows you to perform various analyses of your WhatPulse typing stats. It does so by accessing the local WhatPulse database on your computer; reading this data into Pandas DataFrames, and then summarizing and graphing that data. The output of the script includes:
 # 
-# More documentation/explanation of the code will be provided in the future.
+# 1. Rolling average calculations at the 7-, 28-, and 365-day level
+# 2. Percentile and rank calculations (so that you can see how today's keypresses compare to past days)
+# 3. Weekly and hourly keypress stats
+# 4. Static (.png) and interactive (.html) keypress charts
+# 
+# By converting this notebook into a Python file and then instructing your computer to run it on an hourly basis, you can also keep track of how much you're typing during your day. Which is sort of nerdy, to be honest. But so is this whole program ;) 
+# 
+# [More documentation will be provided in the future]
+
+# %% [markdown]
+# I'll first import a number of packages that the program will use:
 
 # %%
 import time
@@ -28,66 +38,77 @@ from IPython.display import Image
 # %% [markdown]
 # ## Importing Whatpulse data
 # 
-# The first step will be to import data from my local Whatpulse database, along with a copy of the Whatpulse database stored on my old laptop.
+# In order to analyze my WhatPulse data, I'll first need to import it from my local Whatpulse SQLite database. I'll also import a copy of the Whatpulse SQLite database stored on my old laptop (so that my analysis doesn't have to be limited to my current computer's keypress data.)
+# 
+# You'll of course need to update the following cell with the path(s) to your own WhatPulse database(s).
+# 
+# Note: if you want to run this program on your own, but don't have access to a WhatPulse database, you can still run this program (assuming you've downloaded or cloned it from GitHub). Skip ahead to the line where I read in 
 
 # %%
 database_paths_list = [r'C:\Users\kburc\AppData\Local\whatpulse\whatpulse.db', r'C:\Users\kburc\D1V1\Documents\whatpulse_database_backups\a13r2_whatpulse.db'] 
-# Note that the first path is to my computer's active database, and that the second path is to a copy of the database stored on my old computer. This approach allows me to include keypress stats that go beyond those stored on my computer.
+# Note that the first path is to my computer's active database, and that the second path is to a copy of the database stored on my old computer. 
 
 # %% [markdown]
-# The following function analyzes each database's keypresses table.
+# The following function analyzes each database's keypresses table at either the daily or hourly level.
 
 # %%
-def generate_daily_keypress_totals(database_path):
+def generate_keypress_totals(database_path, level = 'daily'):
+    '''The level argument can be 'daily', in which case the DataFrame
+    returned by the function will show daily keypress totals, or 'hourly',
+    which will preserve the hourly keypress totals in the original database.'''
     file_name = database_path.split('\\')[-1]
-    sqlalchemy_sqlite_engine = sqlalchemy.create_engine('sqlite:///'+database_path) # Based on https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#connect-strings
+    sqlalchemy_sqlite_engine = sqlalchemy.create_engine(
+        'sqlite:///'+database_path) # Based on https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#connect-strings
     sqlalchemy_connection = sqlalchemy_sqlite_engine.connect()
-    df_keypresses = pd.read_sql("select * from keypresses", con = sqlalchemy_sqlite_engine)
-    df_keypresses.drop('hour',axis=1,inplace=True) # I'm only interested in 
-    # daily keypresses for the purposes of this program. (In the future, I may
-    # examine keypresses by hour as well.)
-    df_daily_keypresses = df_keypresses.groupby('day').sum()
-    if '0000-00-00' in df_daily_keypresses.index:
-        df_daily_keypresses.drop('0000-00-00',inplace=True)
-    df_daily_keypresses.rename(columns={'count':'keypresses'},inplace=True)    
-    df_daily_keypresses.sort_values('day',inplace=True)
-    df_daily_keypresses['source'] = database_path.split('\\')[-1]
-    # print("\nNow analyzing", database_path.split('\\')[-1]+":")
-    # print("Total keypresses so far with this computer:",sum(df_daily_keypresses['keypresses']))
-    # print("Maximum keypresses in one day with this computer:",max(df_daily_keypresses['keypresses']))
-    # print("Average daily keypresses (at least for days with 1 or more keypresses):",np.mean(df_daily_keypresses['keypresses']))
-    # plt.plot(df_daily_keypresses['keypresses'])
-    return df_daily_keypresses
-
-# %%
-def generate_hourly_keypress_totals(database_path):
-    file_name = database_path.split('\\')[-1]
-    sqlalchemy_sqlite_engine = sqlalchemy.create_engine('sqlite:///'+database_path) # Based on https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#connect-strings
-    sqlalchemy_connection = sqlalchemy_sqlite_engine.connect()
-    df_keypresses = pd.read_sql("select * from keypresses", con = sqlalchemy_sqlite_engine)
-    df_keypresses = df_keypresses.query("day != '0000-00-00'").copy() # Removes 
-    # any rows that have a date of 0000-00-00
+    df_keypresses = pd.read_sql("select * from keypresses", 
+    con = sqlalchemy_sqlite_engine) # Simply reads all of the data from this 
+    # table into a Pandas DataFrame
+    df_keypresses = df_keypresses.query("day != '0000-00-00'").copy() # Removes
+    # this blank date value from the database if it happens to be there
+    if level == 'daily':
+        df_keypresses = df_keypresses.pivot_table(
+            index = 'day', values = 'count', aggfunc = 'sum')
+        df_keypresses.sort_values('day', inplace = True)
+    elif level == 'hourly': # The original data is already displayed 
+        # at the hourly level, so there's no need for a pivot_table() call.
+        df_keypresses.sort_values(['day', 'hour'], inplace = True)
+    else:
+        raise ValueError("Unrecognized level argument passed to function.")
+    df_keypresses.rename(columns={'count':'keypresses'},inplace=True)  
+    # The above line groups the hourly rows in the DataFrame into daily rows.
     return df_keypresses
 
 # %%
 keypress_databases_list = []
 
 for path in database_paths_list:
-    keypress_databases_list.append(generate_daily_keypress_totals(path))
+    keypress_databases_list.append(generate_keypress_totals(path, level = 'daily'))
 
 df_combined_daily_keypresses = pd.concat([keypress_databases_list[i] for i in range(len(keypress_databases_list))])
 df_combined_daily_keypresses.sort_index(inplace=True)
-df_combined_daily_keypresses = df_combined_daily_keypresses.groupby('day').sum() # This gets rid of the 'source' column, but that's OK, since this line is necessary to adjust for days where multiple computers were used.
+
+# At this point, my copy of df_combined_daily_keypresses has multiple
+# entries for a few days in which I logged keys on both computers.
+# Therefore, the following line groups these entries into a single row
+# for each date.
+df_combined_daily_keypresses = df_combined_daily_keypresses.reset_index().pivot_table(index = 'day', values = 'keypresses', aggfunc = 'sum')
 df_combined_daily_keypresses.index = pd.to_datetime(df_combined_daily_keypresses.index)
-# print(len(df_combined_daily_keypresses))
+
+df_combined_daily_keypresses.to_csv('data/df_combined_daily_keypresses.csv')
 df_combined_daily_keypresses
 
+# %% [markdown]
+# The following line updates df_combined_daily_keypresses with the copy of this DataFrame that just got exported to a .csv. The purpose of this cell is to allow you to run this script even if you don't have your own WhatPulse database.
 
 # %%
-
+df_combined_daily_keypresses = pd.read_csv('data/df_combined_daily_keypresses.csv', index_col='day')
+# The following line allows the DataFrame's index to be compatible with certain
+# date operations that the following code block will perform.
+df_combined_daily_keypresses.index = pd.to_datetime(df_combined_daily_keypresses.index)
+df_combined_daily_keypresses
 
 # %% [markdown]
-# The following code block fills in the DataFrame with missing dates (e.g. dates in which I did not have any keypresses).
+# The following code block fills in the DataFrame with missing dates (e.g. dates in which I did not have any keypresses). I want to add in those missing dates so that I can calculate more accurate rolling averages.
 
 # %%
 first_date = df_combined_daily_keypresses.index[0]
@@ -96,6 +117,9 @@ full_date_range = pd.date_range(start=first_date, end = last_date) # https://pan
 df_combined_daily_keypresses = df_combined_daily_keypresses.reindex(full_date_range, fill_value=0) # See https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html
 df_combined_daily_keypresses.index.name = 'Date'
 df_combined_daily_keypresses.reset_index(inplace=True) 
+
+# %% [markdown]
+# Now that I have a more complete daily keypress history, I can begin performing analyses on this data. First, I will use the rolling() function within Pandas to calculate 7-, 28-, and 365-day moving averages.
 
 # %%
 df_combined_daily_keypresses['7_day_ma'] = df_combined_daily_keypresses['keypresses'].rolling(7).mean()
@@ -106,6 +130,9 @@ df_combined_daily_keypresses['365_day_ma'] = df_combined_daily_keypresses['keypr
 df_combined_daily_keypresses['percentile'] = 100*df_combined_daily_keypresses['keypresses'].rank(pct=True)
 df_combined_daily_keypresses['rank'] = df_combined_daily_keypresses['keypresses'].rank(ascending = False)
 df_combined_daily_keypresses
+
+# %% [markdown]
+# <h2 style="color:cyan"> Here with editing</h2>
 
 # %% [markdown]
 # Adding in weekdays:
@@ -289,6 +316,9 @@ df_days_with_higher_keypresses
 # %%
 duplicated_keypress_dates = df_combined_daily_keypresses[df_combined_daily_keypresses.duplicated(subset = 'keypresses', keep = False)].query('keypresses > 0').sort_values('keypresses', ascending = False)
 # print(f"There have been {len(duplicated_keypress_dates)} dates that share keypresses with at least one other date. (This total does not include dates with 0 keypresses.)")
+len(duplicated_keypress_dates)
+
+# %%
 duplicated_keypress_dates
 
 # %%
@@ -358,6 +388,9 @@ Image('graphs\\px_daily_keypresses_and_mas_static.png')
 # %%
 test_df = df_combined_daily_keypresses.copy()
 
+# %% [markdown]
+# ## Monthly keypress totals:
+
 # %%
 df_monthly_keypresses = test_df.set_index('Date').resample('M').sum()['keypresses'].reset_index()
 df_monthly_keypresses['Month'] = df_monthly_keypresses['Date'].dt.to_period('M')
@@ -404,11 +437,43 @@ df_combined_daily_keypresses.to_csv('whatpulse_daily_keypresses.csv')
 hourly_keypress_db_list = []
 
 for db_path in database_paths_list:
-    hourly_keypress_db_list.append(generate_hourly_keypress_totals(database_path = db_path))
+    hourly_keypress_db_list.append(generate_keypress_totals(database_path = db_path, level = 'hourly'))
 
 df_hourly_keypresses = pd.concat([df for df in hourly_keypress_db_list]).reset_index(drop=True)
-df_hourly_keypresses.sort_values(by=['day', 'hour'], inplace = True)
+
+# As with my daily keypresess DataFrame, I'll use pivot_table() to group 
+# multiple rows for the same day and hour into a single row. (These multiple 
+# rows are the result of my using multiple computers during the same hour.)
+df_hourly_keypresses = df_hourly_keypresses.pivot_table(index = ['day', 'hour'], values = 'keypresses', aggfunc = 'sum').reset_index().sort_values(['day', 'hour'])
+
+df_hourly_keypresses.to_csv('data/df_combined_hourly_keypresses.csv', index = False)
 df_hourly_keypresses
+
+# %%
+df_hourly_keypresses = pd.read_csv('data/df_combined_hourly_keypresses.csv')
+df_hourly_keypresses['day'] = pd.to_datetime(df_hourly_keypresses['day'])
+
+# %%
+df_hourly_keypresses['day_and_hour'] = df_hourly_keypresses['day'] + pd.to_timedelta(df_hourly_keypresses['hour'], unit = 'H')
+df_hourly_keypresses.set_index('day_and_hour', inplace = True)
+df_hourly_keypresses
+
+# %%
+full_hourly_date_range = pd.date_range(start = first_date, end = last_date, freq = 'H')
+df_hourly_keypresses = df_hourly_keypresses.reindex(full_hourly_date_range)
+df_hourly_keypresses['keypresses'].fillna(0, inplace = True)
+df_hourly_keypresses['keypresses'] = df_hourly_keypresses['keypresses'].astype('int')
+df_hourly_keypresses['day'] = df_hourly_keypresses.index.date
+df_hourly_keypresses['hour'] = df_hourly_keypresses.index.hour
+df_hourly_keypresses
+
+# %%
+df_hourly_keypresses.reset_index(drop=True,inplace=True)
+
+df_hourly_keypresses
+
+# %%
+df_hourly_keypresses[df_hourly_keypresses.duplicated(subset = ['day', 'hour'], keep = False)]
 
 # %%
 print("Most recent hourly keypress logs:\n",df_hourly_keypresses.iloc[-20:])
@@ -417,19 +482,22 @@ print("Most recent hourly keypress logs:\n",df_hourly_keypresses.iloc[-20:])
 # Most keypresses typed in a single hour:
 
 # %%
-df_hourly_keypresses.sort_values('count', ascending = False)
+df_hourly_keypresses.sort_values('keypresses', ascending = False)
 
 # %% [markdown]
 # Keypresses by hour:
 
 # %%
-df_hourly_avg_pivot = df_hourly_keypresses.pivot_table(index = 'hour', values = 'count', aggfunc = 'mean').reset_index()
-df_hourly_avg_pivot.rename(columns={'count':'average'},inplace=True)
+df_hourly_avg_pivot = df_hourly_keypresses.pivot_table(index = 'hour', values = 'keypresses', aggfunc = 'mean').reset_index()
+df_hourly_avg_pivot.rename(columns={'keypresses':'average'},inplace=True)
 df_hourly_avg_pivot
 
 # %%
-df_hourly_pivot = df_hourly_keypresses.pivot_table(index = 'hour', values = 'count', aggfunc = 'sum').reset_index()
-df_hourly_pivot.rename(columns={'count':'sum'},inplace=True)
+px.bar(df_hourly_avg_pivot, x = 'hour', y = 'average')
+
+# %%
+df_hourly_pivot = df_hourly_keypresses.pivot_table(index = 'hour', values = 'keypresses', aggfunc = 'sum').reset_index()
+df_hourly_pivot.rename(columns={'keypresses':'sum'},inplace=True)
 df_hourly_pivot = df_hourly_pivot.merge(df_hourly_avg_pivot, on = 'hour')
 total_keypresses = df_hourly_pivot['sum'].sum()
 df_hourly_pivot['pct_of_total'] = 100* df_hourly_pivot['sum'] / total_keypresses
@@ -463,6 +531,9 @@ run_seconds = run_time % 60
 
 # %%
 input() # Keeps console window open when running the file in a command prompt.
+# It's not necessary for the Jupyter Notebook, but when I export this notebook
+# as a Python script and then run the script on a scheduled basis, this 
+# line gives me time to read the output.
 # See nosklo's response at: https://stackoverflow.com/a/1000968/13097194
 
 
