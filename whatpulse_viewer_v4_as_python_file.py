@@ -666,12 +666,12 @@ day_after_honeymoon = datetime.date(2023, 4, 29) # I didn't type much at all
 df_hourly_keypresses_pre_marriage = df_hourly_keypresses.query(
 "Day > @post_mba_work_start_date & Day <= @last_day_before_marriage"
 ).pivot_table(index = 'Hour', values = 'Keypresses', aggfunc = 'mean').reset_index()
-df_hourly_keypresses_pre_marriage['Period'] = 'Pre-Marriage'
+df_hourly_keypresses_pre_marriage['Period'] = 'Before Marriage'
 
 df_hourly_keypresses_post_marriage = df_hourly_keypresses.query(
     "Day >= @day_after_honeymoon").pivot_table(
         index = 'Hour', values = 'Keypresses', aggfunc = 'mean').reset_index()
-df_hourly_keypresses_post_marriage['Period'] = 'Post-Marriage'
+df_hourly_keypresses_post_marriage['Period'] = 'After Marriage'
 
 # Combining these two DataFrames together:
 df_hourly_keypresses_by_period = pd.concat([df_hourly_keypresses_pre_marriage,
@@ -681,7 +681,7 @@ df_hourly_keypresses_by_period
 
 
 # %% [markdown]
-# My overall number of keypresses is slightly higher post-marriage than pre-marriage:
+# My daily keypress counts have increased slightly since getting married (at least when the honeymoon isn't taken into account):
 
 # %%
 df_hourly_keypresses_by_period.pivot_table(
