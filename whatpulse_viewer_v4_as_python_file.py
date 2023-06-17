@@ -358,7 +358,8 @@ df_weekday_pivot
 # %%
 fig_keypresses_by_weekday = px.bar(df_weekday_pivot, x = 'Weekday', 
 y = 'Keypresses', text_auto = '.0f', color = 'Keypresses', 
-color_continuous_scale = 'PrGn')
+color_continuous_scale = 'PrGn',
+title = 'Average Keypresses by Weekday')
 # For text_auto, see: 
 # https://plotly.com/python-api-reference/generated/plotly.express.bar
 
@@ -452,7 +453,9 @@ df_combined_daily_keypresses['Date']
 
 # %%
 fig_keypresses_line_chart = px.line(df_combined_daily_keypresses, x = 'Date', 
-y = ['Keypresses', '7_day_ma', '28_day_ma', '365_day_ma']) 
+y = ['Keypresses', '7_day_ma', '28_day_ma', '365_day_ma'],
+labels = {'variable':'Metric','value':'Keypresses'}, title = 
+'Daily Keypresses and 7/28/365-day Moving Averages') 
 # Note that multiple y values can be passed to the line chart. 
 
 save_chart(fig_keypresses_line_chart, 'px_daily_keypresses_and_mas')
@@ -628,7 +631,7 @@ sum(df_hourly_pivot['pct_of_total'])
 # %%
 fig_hourly_keypresses = px.bar(df_hourly_pivot, x = 'Hour', 
 y = 'Average Keypresses', text_auto = '.0f', 
-title = 'Average Keypresses per Hour')
+title = 'Average Keypresses by Hour')
 save_chart(fig_hourly_keypresses, 'average_keypresses_by_hour')
 fig_hourly_keypresses
 
