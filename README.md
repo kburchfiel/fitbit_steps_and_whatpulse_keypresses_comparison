@@ -6,4 +6,4 @@ Click here to read a blog post about the Whatpulse component of this project (e.
 
 Sample output from whatpulse_viewer_v4.ipynb:
 
-[!](https://raw.githubusercontent.com/kburchfiel/fitbit_steps_and_whatpulse_keypresses_comparison/master/graphs/static/average_keypresses_by_hour.png)
+![](https://raw.githubusercontent.com/kburchfiel/fitbit_steps_and_whatpulse_keypresses_comparison/master/graphs/static/average_keypresses_by_hour.png)
