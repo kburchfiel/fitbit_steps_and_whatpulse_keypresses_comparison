@@ -104,11 +104,17 @@ def generate_keypress_totals(database_path, level = 'daily'):
 # I'll now run generate_keypress_totals in order to create a record of daily keypresses for both my current database and a copy of a past database. (I'll look at hourly keypress totals later on.)
 
 # %%
+sqlalchemy_sqlite_engine = sqlalchemy.create_engine(
+        'sqlite:///'+'C:/Users/kburc/AppData/Local/whatpulse/whatpulse.db') 
+sqlalchemy_connection = sqlalchemy_sqlite_engine.connect()
+sqlalchemy_connection
+
+# %%
 keypress_databases_list = []
 
 for path in database_paths_list: # This loop creates a DataFrame for
     # each WhatPulse database stored in database_paths_list.
-    # print("Now loading:",path)
+    print("Now loading:",path)
     keypress_databases_list.append(generate_keypress_totals(
         path, level = 'daily'))
 
@@ -542,9 +548,9 @@ pd.Timestamp.now()
 
 # %%
 full_hourly_date_range = pd.date_range(start = first_date, 
-end = last_date_for_hourly_keypress_log, freq = 'H')
-df_hourly_keypresses = df_hourly_keypresses.reindex(full_hourly_date_range)
-df_hourly_keypresses['Keypresses'].fillna(0, inplace = True)
+end = last_date_for_hourly_keypress_log, freq = 'h')
+df_hourly_keypresses = df_hourly_keypresses.reindex(full_hourly_date_range).copy()
+df_hourly_keypresses['Keypresses'] = df_hourly_keypresses['Keypresses'].fillna(0)
 df_hourly_keypresses['Keypresses'] = df_hourly_keypresses[
     'Keypresses'].astype('int')
 # Retrieving date and hour values from the index:
@@ -594,7 +600,22 @@ df_hourly_keypresses[df_hourly_keypresses.duplicated(
 # Most keypresses typed in a single hour within the entire dataset:
 
 # %%
-df_hourly_keypresses.sort_values('Keypresses', ascending = False).head(50)
+df_top_hourly_keypresses = df_hourly_keypresses.sort_values('Keypresses', ascending = False).head(50).copy()
+df_top_hourly_keypresses['Day and Hour'] = (
+df_top_hourly_keypresses['Day'].astype('str') + ' ' +
+df_top_hourly_keypresses['Hour'].astype('str'))
+df_top_hourly_keypresses
+
+# %%
+df_top_hourly_keypresses.head(3)
+
+# %%
+fig_top_hourly_keypresses = px.bar(df_top_hourly_keypresses, x = 'Day and Hour', 
+y = 'Keypresses', text_auto = '.0f', 
+title = 'Top Hourly Keypresses')
+fig_top_hourly_keypresses.update_xaxes(type='category')
+save_chart(fig_top_hourly_keypresses, 'top_hourly_keypresses')
+fig_top_hourly_keypresses
 
 # %% [markdown]
 # Average keypresses by hour:
